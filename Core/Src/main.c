@@ -204,8 +204,12 @@ static void SystemPower_Config(void)
 /* USER CODE BEGIN 4 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  HAL_UART_Receive_IT(&huart3, rx_buff, 10);
-  received = 1;
+	if(huart == &huart3){
+		HAL_UART_Receive_IT(&huart3, rx_buff, 10);
+		received = 1;
+		HAL_UART_Receive_IT(&huart3, rx_buff, 10);
+	}
+
 }
 /* USER CODE END 4 */
 
