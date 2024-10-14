@@ -18,11 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "gpdma.h"
 #include "icache.h"
 #include "memorymap.h"
 #include "usart.h"
 #include "gpio.h"
-
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -100,10 +100,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_GPDMA1_Init();
   MX_ICACHE_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_IT(&huart3, rx_buff, 10);
+  HAL_UART_Receive_DMA(&huart3, rx_buff, 10);
   /* USER CODE END 2 */
 
   /* Initialize COM1 port (115200, 8 bits (7-bit data + 1 stop bit), no parity */
@@ -129,11 +130,11 @@ int main(void)
   {
 
     /* USER CODE END WHILE */
-	  if(received == 1){
-		  HAL_UART_Transmit_IT(&huart3, (uint8_t*)message, sizeof(message)-1);
-		  received = 0;
-	  }
     /* USER CODE BEGIN 3 */
+	  if(received == 1){
+	  	HAL_UART_Transmit_DMA(&huart3, (uint8_t*)message, sizeof(message)-1);
+	  	received = 0;
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -205,9 +206,11 @@ static void SystemPower_Config(void)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if(huart == &huart3){
-		HAL_UART_Receive_IT(&huart3, rx_buff, 10);
+		// HAL_UART_Transmit_DMA(&huart1,(uint8_t *) "Message Received!\r\n", sizeof("Message Received!\r\n"));
+		HAL_UART_Receive_DMA(&huart3, rx_buff, 10);
 		received = 1;
-		HAL_UART_Receive_IT(&huart3, rx_buff, 10);
+		HAL_UART_Receive_DMA(&huart3, rx_buff, 10);
+
 	}
 
 }
