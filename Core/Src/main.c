@@ -22,11 +22,12 @@
 #include "memorymap.h"
 #include "usart.h"
 #include "gpio.h"
-#include <string.h>
-#include <stdio.h>
+
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +47,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 
+COM_InitTypeDef BspCOMInit;
+__IO uint32_t BspButtonState = BUTTON_RELEASED;
 
 /* USER CODE BEGIN PV */
 
@@ -60,93 +63,9 @@ static void SystemPower_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-HAL_StatusTypeDef HAL_UART_ReceiveString(
-        UART_HandleTypeDef *huart, uint8_t *pData,
-        uint16_t Size, uint32_t Timeout) {
-    const char newline[] = "\r\n";
-    const char delete[] = "\x08 \x08";
-    HAL_StatusTypeDef status;
+uint8_t rx_buff[10];
+volatile uint8_t received = 0;
 
-    if(Size == 0)
-        return HAL_ERROR;
-
-    int i = 0;
-    for(;;) {
-        status = HAL_UART_Receive(huart, &pData[i], 1, Timeout);
-        if(status != HAL_OK)
-            return status;
-
-        if((pData[i] == '\x08')||(pData[i] == '\x7F')) { // backspace
-            if(i > 0) {
-                status = HAL_UART_Transmit(huart, (uint8_t*)delete,
-                                           sizeof(delete)-1, Timeout);
-                if(status != HAL_OK)
-                    return status;
-                i--;
-            }
-            continue;
-        }
-
-        if((pData[i] == '\r') || (pData[i] == '\n')) {
-            pData[i] = '\0';
-            status = HAL_UART_Transmit(huart, (uint8_t*)newline,
-                                       sizeof(newline)-1, Timeout);
-            if(status != HAL_OK)
-                return status;
-            break;
-        }
-
-        // last character is reserved for '\0', ignore
-        if(i == (Size-1))
-            continue;
-
-        status = HAL_UART_Transmit(huart, &pData[i], 1, Timeout);
-        if(status != HAL_OK)
-            return status;
-        i++;
-    }
-
-    return HAL_OK;
-}
-
-void error(void) {
-    HAL_Delay(HAL_MAX_DELAY);
-}
-
-void init(void) {
-    const char ready[] = "Ready!\r\n";
-    HAL_UART_Transmit(&huart3, (uint8_t*)ready,
-                      sizeof(ready)-1, HAL_MAX_DELAY);
-}
-
-void loop(void) {
-    HAL_StatusTypeDef status;
-    const char question[] = "What is your name?\r\n";
-    char answer[256];
-    char name[32];
-
-    status = HAL_UART_Transmit(&huart3, (uint8_t*)question,
-                               sizeof(question)-1, HAL_MAX_DELAY);
-    if(status != HAL_OK)
-        error();
-
-    status = HAL_UART_ReceiveString(&huart3, (uint8_t*)name,
-                                    sizeof(name), HAL_MAX_DELAY);
-    if(status != HAL_OK)
-        error();
-
-    int code = snprintf(answer, sizeof(answer),
-                        "Hello, %s!\r\n", name);
-    if(code < 0)
-        error();
-
-    status = HAL_UART_Transmit(&huart3, (uint8_t*)answer,
-                               strlen(answer), HAL_MAX_DELAY);
-    if(status != HAL_OK)
-        error();
-
-    HAL_Delay(100);
-}
 /* USER CODE END 0 */
 
 /**
@@ -157,7 +76,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	const char message[] = "Received data from UART\n\r";
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -184,23 +103,36 @@ int main(void)
   MX_ICACHE_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_UART_Receive_IT(&huart3, rx_buff, 10);
   /* USER CODE END 2 */
+
+  /* Initialize COM1 port (115200, 8 bits (7-bit data + 1 stop bit), no parity */
+  BspCOMInit.BaudRate   = 115200;
+  BspCOMInit.WordLength = COM_WORDLENGTH_8B;
+  BspCOMInit.StopBits   = COM_STOPBITS_1;
+  BspCOMInit.Parity     = COM_PARITY_NONE;
+  BspCOMInit.HwFlowCtl  = COM_HWCONTROL_NONE;
+  if (BSP_COM_Init(COM1, &BspCOMInit) != BSP_ERROR_NONE)
+  {
+    Error_Handler();
+  }
 
   /* USER CODE BEGIN BSP */
 
   /* -- Sample board code to send message over COM1 port ---- */
-
+  printf("Hello using printf\n\r");
   /* USER CODE END BSP */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  init();
   while (1)
   {
 
     /* USER CODE END WHILE */
-	  loop();
+	  if(received == 1){
+		  HAL_UART_Transmit_IT(&huart3, (uint8_t*)message, sizeof(message)-1);
+		  received = 0;
+	  }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -270,7 +202,11 @@ static void SystemPower_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  HAL_UART_Receive_IT(&huart3, rx_buff, 10);
+  received = 1;
+}
 /* USER CODE END 4 */
 
 /**
